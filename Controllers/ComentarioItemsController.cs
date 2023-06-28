@@ -22,23 +22,16 @@ namespace ComentariosApi.Controllers
 
         // GET: api/ComentarioItems
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ComentarioItem>>> GetComentarioItems()
+        public async Task<ActionResult<IEnumerable<ComentarioItemDTO>>> GetComentarioItems()
         {
-          if (_context.ComentarioItems == null)
-          {
-              return NotFound();
-          }
-            return await _context.ComentarioItems.ToListAsync();
+            return await _context.ComentarioItems
+            .Select(x => ItemCoDTO(x)).ToListAsync();
         }
 
         // GET: api/ComentarioItems/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<ComentarioItem>> GetComentarioItem(long id)
+        public async Task<ActionResult<ComentarioItemDTO>> GetComentarioItem(long id)
         {
-          if (_context.ComentarioItems == null)
-          {
-              return NotFound();
-          }
             var comentarioItem = await _context.ComentarioItems.FindAsync(id);
 
             if (comentarioItem == null)
@@ -46,35 +39,35 @@ namespace ComentariosApi.Controllers
                 return NotFound();
             }
 
-            return comentarioItem;
+            return ItemCoDTO(comentarioItem);
         }
 
         // PUT: api/ComentarioItems/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutComentarioItem(long id, ComentarioItem comentarioItem)
+        public async Task<IActionResult> PutComentarioItem(long id, ComentarioItemDTO comentarioDTO)
         {
-            if (id != comentarioItem.Id)
+            if (id != comentarioDTO.Id)
             {
                 return BadRequest();
             }
+            var comentarioItem = await _context.ComentarioItems.FindAsync(id);
+            if(comentarioItem == null)
+            {
+                return NotFound();
+            }
 
-            _context.Entry(comentarioItem).State = EntityState.Modified;
+            comentarioItem.Name = comentarioDTO.Name;
+            comentarioItem.IsComplete = comentarioDTO.IsComplete;
+            comentarioItem.Text = comentarioDTO.Text;
 
             try
             {
                 await _context.SaveChangesAsync();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException) when (!ComentarioItemExists(id))
             {
-                if (!ComentarioItemExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                return NotFound();
             }
 
             return NoContent();
@@ -83,26 +76,27 @@ namespace ComentariosApi.Controllers
         // POST: api/ComentarioItems
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<ComentarioItem>> PostComentarioItem(ComentarioItem comentarioItem)
+        public async Task<ActionResult<ComentarioItemDTO>> PostComentarioItem(ComentarioItemDTO comentarioItemDTO)
         {
-          if (_context.ComentarioItems == null)
-          {
-              return Problem("Entity set 'ComentarioContext.ComentarioItems'  is null.");
-          }
+            var comentarioItem = new ComentarioItem
+            {
+                IsComplete = comentarioItemDTO.IsComplete,
+                Name = comentarioItemDTO.Name, 
+                Text = comentarioItemDTO.Text
+            };
             _context.ComentarioItems.Add(comentarioItem);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetComentarioItem", new { id = comentarioItem.Id }, comentarioItem);
+            return CreatedAtAction(
+                nameof(GetComentarioItem),
+                new{ id = comentarioItem.Id}, 
+                ItemCoDTO(comentarioItem));
         }
 
         // DELETE: api/ComentarioItems/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteComentarioItem(long id)
         {
-            if (_context.ComentarioItems == null)
-            {
-                return NotFound();
-            }
             var comentarioItem = await _context.ComentarioItems.FindAsync(id);
             if (comentarioItem == null)
             {
@@ -117,7 +111,16 @@ namespace ComentariosApi.Controllers
 
         private bool ComentarioItemExists(long id)
         {
-            return (_context.ComentarioItems?.Any(e => e.Id == id)).GetValueOrDefault();
+            return _context.ComentarioItems.Any(e => e.Id == id);
         }
+
+        private static ComentarioItemDTO ItemCoDTO(ComentarioItem comentarioItem) =>
+            new ComentarioItemDTO
+            {
+                Id = comentarioItem.Id,
+                Name = comentarioItem.Name,
+                IsComplete = comentarioItem.IsComplete,
+                Text = comentarioItem.Text
+            };
     }
 }
